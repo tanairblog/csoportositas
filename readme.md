@@ -101,7 +101,7 @@ Ha 20 diák pontozott, a dalok valójában egy 20 dimenziós térben lebegnek, a
 
 A térképen a diákok a középpontból kiinduló nyilakként jelennek meg. A nyíl iránya azt mutatja, hogy az adott ember a 3D tér melyik sarka felé húz, vagyis merre találhatók azok a dalok, amiket a saját átlagához képest a leginkább szeretett. Ha két diák nyila közel párhuzamos, az ízlésük rokon; ha egymással szembe mutatnak, akkor a csoport két ellenpólusát képviselik. 
 
-...
+
 
 ## Mi a matek?
 
@@ -113,4 +113,4 @@ ahol $r_{ab}$ a Pearson-féle korrelációs együttható. Mivel ez a kapcsolat s
 
 A standardizált, $n \times p$ dimenziós $\mathbf{Z}$ mátrixot (dalok $\times$ diákok) ezután szinguláris érték felbontással (SVD) dekomponáljuk: $\mathbf{Z} = \mathbf{U} \mathbf{\Sigma} \mathbf{V}^T$. A főkomponens-elemzés (PCA) meghatározza a mintakovariancia-mátrix azon három ortogonális sajátvektorát, amelyek a lehető legtöbb közös értékelési varianciát fedik le. A dalok 3D koordinátáit a főkomponens-pontszámok mátrixa adja meg ($\mathbf{T}_3 = \mathbf{Z}\mathbf{V}_3$), míg a diákok a $\mathbf{V}_3$ segítségével meghatározott súlyvektorokként (loadings) vetülnek a térbe. Mivel ez az alacsony rangú faktorizáció a standardizált értékeket a $\mathbf{Z} \approx \mathbf{T}_3 \mathbf{V}_3^T$ formulával rekonstruálja, egy adott dal térbeli pozíciójának ($\mathbf{t}_i$) és egy diák súlyvektorának ($\mathbf{v}_j$) skaláris szorzata éppen a diák becsült standardizált preferenciáját ($\hat{z}_{ij}$) adja. Következésképpen az azonos szavazási mintázatot kapott dalok a térben egymás mellé rendeződnek, a diákok vektorai pedig közvetlenül azon dalcsoportok felé mutatnak, amelyeket a saját átlagukhoz képest a legmagasabbra értékeltek.
 
-```
+
