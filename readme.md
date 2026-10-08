@@ -82,4 +82,36 @@ python music_map.py
 
 ```
 
+## Hogyan csinálja?
+
+A háttérben zajló folyamat négy matematikai lépésre épül:
+
+**1. A személyes pontozási stílus kisimítása (standardizálás)**
+
+Mindenki másképp skáláz: van, akinél a 7-es már lelkes dicséret, más szinte mindenkinek 9-et vagy 10-et ad. A számítás ezért nem a nyers pontszámokat nézi, hanem azt, hogy egy adott dal mennyivel tér el az illető saját átlagától (z-score). Ezzel a szigorú és a megengedő értékelők ugyanarra a közös skálára kerülnek.
+
+**2. A hasonlóság mérése (korreláció mint távolság)**
+
+Két dal akkor kerül közel egymáshoz, ha a csoport tagjai hasonlóan reagáltak rájuk: ugyanazok emelték ki vagy húzták le őket. A standardizált értékek közötti geometriai távolság pontosan a statisztikai korrelációnak felel meg. Nem az számít, hogy hány pontot kapott a szám, hanem az, hogy kiknek az ízlése mozgott együtt a megítélésekor.
+
+**3. Vetítés 3D térbe (főkomponens-elemzés / PCA)**
+
+Ha 20 diák pontozott, a dalok valójában egy 20 dimenziós térben lebegnek, ahol minden diák véleménye egy külön tengely. Ezt emberi szemmel lehetetlen átlátni. A PCA algoritmus megkeresi azt a 3 legfontosabb fő irányt (a véleménykülönbségek három legerősebb törésvonalát), amelyek a csoport ízlésbeli varianciájának legnagyobb részét lefedik. A sokdimenziós pontfelhőt erre a három tengelyre vetíti le, így kapunk egy forgatható 3D térképet.
+
+**4. A diákok beillesztése (ízlésvektorok)**
+
+A térképen a diákok a középpontból kiinduló nyilakként jelennek meg. A nyíl iránya azt mutatja, hogy az adott ember a 3D tér melyik sarka felé húz, vagyis merre találhatók azok a dalok, amiket a saját átlagához képest a leginkább szeretett. Ha két diák nyila közel párhuzamos, az ízlésük rokon; ha egymással szembe mutatnak, akkor a csoport két ellenpólusát képviselik. 
+
+...
+
+## Mi a matek?
+
+Az értékeléseket először diákonként centráljuk és skálázzuk $z$-értékekké ($z_{ij} = \frac{x_{ij} - \mu_j}{\sigma_j}$), ami semlegesíti az egyéni értékelői torzításokat (például az általános megengedőséget vagy szigort). Matematikailag két standardizált vektor, $\mathbf{z}_a$ és $\mathbf{z}_b$ négyzetes euklideszi távolsága $n$ dal esetén a következő összefüggést követi:
+
+$$\Vert{}\mathbf{z}_a - \mathbf{z}_b\Vert{}^2 = \sum_{i=1}^{n} (z_{ia} - z_{ib})^2 = 2(n - 1)(1 - r_{ab})$$
+
+ahol $r_{ab}$ a Pearson-féle korrelációs együttható. Mivel ez a kapcsolat szigorúan monoton, a standardizált koordinátákon számított euklideszi távolság matematikailag egyenértékű a Pearson-féle korrelációs távolság $(1 - r)$ alapján történő klaszterezéssel. A pontok nem az abszolút numerikus pontszámok azonossága miatt csoportosulnak, hanem azért, mert a relatív értékelési csúcsaik és mélypontjaik következetesen együtt mozognak (kovariálnak) a mintában.
+
+A standardizált, $n \times p$ dimenziós $\mathbf{Z}$ mátrixot (dalok $\times$ diákok) ezután szinguláris érték felbontással (SVD) dekomponáljuk: $\mathbf{Z} = \mathbf{U} \mathbf{\Sigma} \mathbf{V}^T$. A főkomponens-elemzés (PCA) meghatározza a mintakovariancia-mátrix azon három ortogonális sajátvektorát, amelyek a lehető legtöbb közös értékelési varianciát fedik le. A dalok 3D koordinátáit a főkomponens-pontszámok mátrixa adja meg ($\mathbf{T}_3 = \mathbf{Z}\mathbf{V}_3$), míg a diákok a $\mathbf{V}_3$ segítségével meghatározott súlyvektorokként (loadings) vetülnek a térbe. Mivel ez az alacsony rangú faktorizáció a standardizált értékeket a $\mathbf{Z} \approx \mathbf{T}_3 \mathbf{V}_3^T$ formulával rekonstruálja, egy adott dal térbeli pozíciójának ($\mathbf{t}_i$) és egy diák súlyvektorának ($\mathbf{v}_j$) skaláris szorzata éppen a diák becsült standardizált preferenciáját ($\hat{z}_{ij}$) adja. Következésképpen az azonos szavazási mintázatot kapott dalok a térben egymás mellé rendeződnek, a diákok vektorai pedig közvetlenül azon dalcsoportok felé mutatnak, amelyeket a saját átlagukhoz képest a legmagasabbra értékeltek.
+
 ```
