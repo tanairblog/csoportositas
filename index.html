@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Zenei Ízléstérkép</title>
+  <!-- CSV értelmező és Plotly 3D könyvtár CDN-ről -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+    }
+    .header p {
+      margin: 0;
+      color: #64748b;
+      font-size: 14px;
+    }
+    .upload-box {
+      background: #ffffff;
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+    .upload-box input {
+      display: none;
+    }
+    .btn {
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn:hover {
+      background: #1d4ed8;
+    }
+    #plot-container {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      height: 750px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>3D Zenei Ízléstérkép</h1>
+    <p>Töltsd fel a pontozási táblázatot (CSV formátumban), és az oldal közvetlenül a böngészőben elkészíti a 3D PCA biplot térképet.</p>
+  </div>
+
+  <div class="upload-box" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept=".csv">
+    <p style="margin: 0 0 12px 0;">Húzd ide a CSV fájlt, vagy kattints a tallózáshoz</p>
+    <button type="button" class="btn">Fájl kiválasztása</button>
+  </div>
+
+  <div id="plot-container"></div>
+</div>
+
+<script>
+// --- 1. FÁJLBEOLVASÁS ---
+const fileInput = document.getElementById('file-input');
+const dropZone = document.getElementById('drop-zone');
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) processCSV(e.target.files[0]);
+});
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.style.borderColor = '#2563eb';
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.style.borderColor = '#cbd5e1';
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.style.borderColor = '#cbd5e1';
+  if (e.dataTransfer.files.length > 0) processCSV(e.dataTransfer.files[0]);
+});
+
+function processCSV(file) {
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      runPCAAndPlot(results.data, results.meta.fields);
+    }
+  });
+}
+
+// --- 2. MATEMATIKAI SEGÉDFÜGGVÉNYEK (PCA & TÁVOLSÁGOK) ---
+
+// Jacobi-módszer szimmetrikus mátrix sajátértékeinek és sajátvektorainak kiszámítására
+function jacobiEigenvalues(A, maxIter = 100) {
+  const n = A.length;
+  let V = Array.from({ length: n }, (_, i) => 
+    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))
+  );
+  let D = A.map(row => [...row]);
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let maxOff = 0;
+    let p = 0, q = 1;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (Math.abs(D[i][j]) > maxOff) {
+          maxOff = Math.abs(D[i][j]);
+          p = i;
+          q = j;
+        }
+      }
+    }
+
+    if (maxOff < 1e-9) break;
+
+    const app = D[p][p];
+    const aqq = D[q][q];
+    const apq = D[p][q];
+    const theta = 0.5 * Math.atan2(2 * apq, aqq - app);
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+
+    for (let k = 0; k < n; k++) {
+      const vkp = V[k][p];
+      const vkq = V[k][q];
+      V[k][p] = c * vkp - s * vkq;
+      V[k][q] = s * vkp + c * vkq;
+    }
+
+    for (let k = 0; k < n; k++) {
+      if (k !== p && k !== q) {
+        const dkp = D[k][p];
+        const dkq = D[k][q];
+        D[k][p] = D[p][k] = c * dkp - s * dkq;
+        D[k][q] = D[q][k] = s * dkp + c * dkq;
+      }
+    }
+    D[p][p] = c * c * app - 2 * s * c * apq + s * s * aqq;
+    D[q][q] = s * s * app + 2 * s * c * apq + c * c * aqq;
+    D[p][q] = D[q][p] = 0;
+  }
+
+  const eigenvalues = D.map((row, i) => ({ value: row[i], index: i }));
+  eigenvalues.sort((a, b) => b.value - a.value);
+
+  const sortedVectors = Array.from({ length: n }, () => []);
+  for (let col = 0; col < n; col++) {
+    const origIdx = eigenvalues[col].index;
+    for (let row = 0; row < n; row++) {
+      sortedVectors[row][col] = V[row][origIdx];
+    }
+  }
+
+  return {
+    values: eigenvalues.map(e => e.value),
+    vectors: sortedVectors
+  };
+}
+
+// --- 3. PCA SZÁMÍTÁS ÉS MEGJELENÍTÉS ---
+function runPCAAndPlot(rows, fields) {
+  const songField = fields[0];
+  const studentNames = fields.slice(1);
+  const songTitles = rows.map(r => String(r[songField] || "Ismeretlen dal"));
+
+  const n = rows.length;
+  const p = studentNames.length;
+
+  if (p < 3) {
+    alert("Legalább 3 diák (oszlop) értékelése szükséges a 3D térhez.");
+    return;
+  }
+
+  // A. Hiányzó értékek pótlása 10.0 ponttal
+  const rawX = rows.map(r => 
+    studentNames.map(name => {
+      const val = r[name];
+      return (val === null || val === undefined || isNaN(val)) ? 10.0 : Number(val);
+    })
+  );
+
+  // B. Standardizálás diákonként (z-score)
+  const Z = Array.from({ length: n }, () => Array(p).fill(0));
+  for (let j = 0; j < p; j++) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += rawX[i][j];
+    const mean = sum / n;
+
+    let varSum = 0;
+    for (let i = 0; i < n; i++) varSum += Math.pow(rawX[i][j] - mean, 2);
+    const std = Math.sqrt(varSum / n) || 1.0;
+
+    for (let i = 0; i < n; i++) {
+      Z[i][j] = (rawX[i][j] - mean) / std;
+    }
+  }
+
+  // C. Kovarianciamátrix: (Z^T * Z) / n
+  const Cov = Array.from({ length: p }, () => Array(p).fill(0));
+  for (let i = 0; i < p; i++) {
+    for (let j = i; j < p; j++) {
+      let dot = 0;
+      for (let k = 0; k < n; k++) dot += Z[k][i] * Z[k][j];
+      Cov[i][j] = Cov[j][i] = dot / n;
+    }
+  }
+
+  // D. Sajátértékek és sajátvektorok (főkomponensek)
+  const { values, vectors } = jacobiEigenvalues(Cov);
+  const totalVariance = values.reduce((acc, v) => acc + Math.max(0, v), 0);
+  const varRatio = values.slice(0, 3).map(v => ((Math.max(0, v) / totalVariance) * 100).toFixed(1));
+
+  // E. Dalok koordinátái a 3D térben: T = Z * V[:, :3]
+  const songCoords = Array.from({ length: n }, () => [0, 0, 0]);
+  let maxCoord = 0;
+
+  for (let i = 0; i < n; i++) {
+    for (let comp = 0; comp < 3; comp++) {
+      let sum = 0;
+      for (let j = 0; j < p; j++) {
+        sum += Z[i][j] * vectors[j][comp];
+      }
+      songCoords[i][comp] = sum;
+      if (Math.abs(sum) > maxCoord) maxCoord = Math.abs(sum);
+    }
+  }
+
+  // F. Diákok irányvektorai (loadings)
+  const scaleFactor = maxCoord * 0.95;
+  const traces = [];
+
+  // Dalok megjelenítése (kék pontok felirattal)
+  traces.push({
+    x: songCoords.map(c => c[0]),
+    y: songCoords.map(c => c[1]),
+    z: songCoords.map(c => c[2]),
+    mode: 'markers+text',
+    text: songTitles,
+    textposition: 'top center',
+    marker: {
+      size: 7,
+      color: '#2563eb',
+      opacity: 0.85
+    },
+    name: 'Dalok',
+    type: 'scatter3d'
+  });
+
+  // Diákok vektorainak rajzolása (piros nyilak a középpontból)
+  for (let j = 0; j < p; j++) {
+    const xEnd = vectors[j][0] * scaleFactor;
+    const yEnd = vectors[j][1] * scaleFactor;
+    const zEnd = vectors[j][2] * scaleFactor;
+
+    // Vektor vonala
+    traces.push({
+      x: [0, xEnd],
+      y: [0, yEnd],
+      z: [0, zEnd],
+      mode: 'lines',
+      line: { color: '#dc2626', width: 4 },
+      showlegend: false,
+      hoverinfo: 'none',
+      type: 'scatter3d'
+    });
+
+    // Név felirat a nyíl végén
+    traces.push({
+      x: [xEnd],
+      y: [yEnd],
+      z: [zEnd],
+      mode: 'text',
+      text: [studentNames[j]],
+      textfont: { color: '#dc2626', size: 12 },
+      showlegend: false,
+      type: 'scatter3d'
+    });
+  }
+
+  const layout = {
+    title: '3D Zenei Ízléstérkép (PCA Biplot)',
+    autosize: true,
+    scene: {
+      xaxis: { title: `Dimenzió 1 (${varRatio[0]}%)` },
+      yaxis: { title: `Dimenzió 2 (${varRatio[1]}%)` },
+      zaxis: { title: `Dimenzió 3 (${varRatio[2]}%)` },
+      bgcolor: '#f8fafc'
+    },
+    margin: { l: 0, r: 0, b: 0, t: 40 }
+  };
+
+  Plotly.newPlot('plot-container', traces, layout, { responsive: true });
+}
+</script>
+
+</body>
+</html>
