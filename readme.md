@@ -1,4 +1,4 @@
-# 3D Ízléstérkép
+# 3D ízléstérkép
 
 Interaktív 3D vizualizációs eszköz zenei preferenciák feltérképezésére főkomponens-elemzés (PCA) és a Plotly könyvtár segítségével.
 
