@@ -80,7 +80,6 @@ python music_map.py
 * **Vektor hossza:** A hosszabb nyíl olyan diákot jelöl, akinek az ízlése szorosan illeszkedik a csoport általános fő irányaihoz (PC1, PC2, PC3). A középponthoz közeli, rövid nyíl olyan résztvevőt jelez, akinek a preferenciái egyediek, eklektikusak, és kívül esnek a közösség főbb mintázatain.
 * **A pontfelhő közepe:** A koordinátarendszer középpontjához $(0, 0, 0)$ közel elhelyezkedő dalok általában a „konszenzusos”, átlagos pontszámot kapott, kevésbé megosztó tételek.
 
-```
 
 ## Hogyan csinálja?
 
